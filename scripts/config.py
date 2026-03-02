@@ -5,7 +5,9 @@ from pathlib import Path
 SKILL_DIR = Path(__file__).parent.parent  # weight-tracker/ 根目录
 DATA_DIR = SKILL_DIR / "data"
 REPORTS_DIR = SKILL_DIR / "reports"
-DEFAULT_CSV = DATA_DIR / "sample.csv"
+DEFAULT_CSV = DATA_DIR / "records.csv"
+SAMPLE_CSV = DATA_DIR / "sample.csv"
+CSV_HEADER = "date,name,weight,calories_in,calories_out,target_weight,start_weight,start_date,end_date"
 
 # === 图片尺寸 ===
 IMAGE_WIDTH = 800
