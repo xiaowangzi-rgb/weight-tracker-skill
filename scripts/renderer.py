@@ -2,13 +2,32 @@
 import io
 import random
 from datetime import date
+from pathlib import Path
 from typing import Optional
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+
+# Configure matplotlib to use CJK font
+_CJK_FONT_PATHS = [
+    "/System/Library/Fonts/PingFang.ttc",
+    "/System/Library/Fonts/STHeiti Light.ttc",
+    "/System/Library/Fonts/Hiragino Sans GB.ttc",
+]
+for _fp in _CJK_FONT_PATHS:
+    if Path(_fp).exists():
+        _cjk_font = fm.FontProperties(fname=_fp)
+        plt.rcParams["font.family"] = _cjk_font.get_name()
+        # Register for matplotlib
+        fm.fontManager.addfont(_fp)
+        plt.rcParams["font.sans-serif"] = [_cjk_font.get_name()] + plt.rcParams.get("font.sans-serif", [])
+        break
+
+plt.rcParams["axes.unicode_minus"] = False  # Fix minus sign display
 
 from config import (
     IMAGE_WIDTH, IMAGE_HEIGHT,
@@ -58,14 +77,14 @@ def render_title(img: Image.Image, team_name: str, day_number: int, days_remaini
     y_start = int(layout["y"] * IMAGE_HEIGHT)
 
     font_title = _get_font(32, bold=True)
-    title_text = f"⚔️ {team_name} · 第{day_number}天战报"
+    title_text = f"{team_name} · 第{day_number}天战报"
     bbox = draw.textbbox((0, 0), title_text, font=font_title)
     text_w = bbox[2] - bbox[0]
     x = (IMAGE_WIDTH - text_w) // 2
     draw.text((x, y_start + 20), title_text, fill=COLOR_GOLD, font=font_title)
 
     font_sub = _get_font(22)
-    sub_text = f"🏰 距离决战还有 {days_remaining} 天"
+    sub_text = f"距离决战还有 {days_remaining} 天"
     bbox = draw.textbbox((0, 0), sub_text, font=font_sub)
     text_w = bbox[2] - bbox[0]
     x = (IMAGE_WIDTH - text_w) // 2
@@ -115,22 +134,22 @@ def render_character_status(img: Image.Image, stats_list: list[dict]):
 
         pct = int(stats["progress"] * 100)
         change = stats["weight_change"]
-        arrow = "⬇️" if change < 0 else "⬆️" if change > 0 else "➡️"
+        arrow = "↓" if change < 0 else "↑" if change > 0 else "→"
         change_color = COLOR_GREEN if change <= 0 else COLOR_RED
         progress_text = f"   进度: {pct}%  {arrow}{abs(change):.1f}kg(较昨日)"
         draw.text((left_margin, bar_y + 25), progress_text, fill=change_color, font=font_small)
 
         cal_y = bar_y + 50
-        cal_text = f"⚡消耗 {stats['calories_out']}kcal   🍖摄入 {stats['calories_in']}kcal"
+        cal_text = f"消耗 {stats['calories_out']}kcal   摄入 {stats['calories_in']}kcal"
         draw.text((left_margin, cal_y), cal_text, fill=COLOR_WHITE, font=font_data)
 
         deficit = stats["calorie_deficit"]
         deficit_y = cal_y + 28
         if deficit <= 0:
-            deficit_text = f"💎 热量缺口 {deficit}kcal  ✨达标！"
+            deficit_text = f"热量缺口 {deficit}kcal  达标！"
             draw.text((left_margin, deficit_y), deficit_text, fill=COLOR_GREEN, font=font_data)
         else:
-            deficit_text = f"⚠️ 热量盈余 +{deficit}kcal  注意控制！"
+            deficit_text = f"热量盈余 +{deficit}kcal  注意控制！"
             draw.text((left_margin, deficit_y), deficit_text, fill=COLOR_RED, font=font_data)
 
         if i < n - 1:
@@ -155,10 +174,10 @@ def render_weight_trend(img: Image.Image, stats_list: list[dict]):
         dates = stats["date_history"]
         weights = stats["weight_history"]
         ax.plot(dates, weights, color=color, linewidth=2, marker="o", markersize=4,
-                label=f"{stats['name']} 实际")
+                label=f"{stats['name']}")
         if dates:
             ax.axhline(y=stats["target_weight"], color=color, linestyle="--",
-                       alpha=0.5, linewidth=1, label=f"{stats['name']} 目标")
+                       alpha=0.5, linewidth=1, label=f"{stats['name']}目标")
 
     ax.set_ylabel("体重 (kg)", color=CHART_TEXT_COLOR, fontsize=10)
     ax.tick_params(colors=CHART_TEXT_COLOR, labelsize=8)
@@ -170,7 +189,7 @@ def render_weight_trend(img: Image.Image, stats_list: list[dict]):
     fig.autofmt_xdate(rotation=30)
     ax.legend(loc="upper right", fontsize=8, facecolor="none",
               edgecolor="none", labelcolor=CHART_TEXT_COLOR)
-    ax.set_title("📈 体重趋势", color=CHART_TEXT_COLOR, fontsize=14, pad=10)
+    ax.set_title("体重趋势", color=CHART_TEXT_COLOR, fontsize=14, pad=10)
     plt.tight_layout()
 
     buf = io.BytesIO()
@@ -178,8 +197,8 @@ def render_weight_trend(img: Image.Image, stats_list: list[dict]):
     plt.close(fig)
     buf.seek(0)
     chart_img = Image.open(buf).convert("RGBA")
-    chart_img = chart_img.resize((IMAGE_WIDTH - 40, area_height - 10), Image.LANCZOS)
-    img.paste(chart_img, (20, y_start + 5), chart_img)
+    chart_img = chart_img.resize((IMAGE_WIDTH - 20, area_height), Image.LANCZOS)
+    img.paste(chart_img, (10, y_start), chart_img)
 
 
 def render_calorie_chart(img: Image.Image, stats_list: list[dict]):
@@ -201,9 +220,9 @@ def render_calorie_chart(img: Image.Image, stats_list: list[dict]):
     cal_in = [s["calories_in"] for s in stats_list]
     cal_out = [s["calories_out"] for s in stats_list]
 
-    bars_in = ax.bar(x - bar_width / 2, cal_in, bar_width, label="🍖 摄入",
+    bars_in = ax.bar(x - bar_width / 2, cal_in, bar_width, label="摄入",
                      color="#ff6b9d", alpha=0.85)
-    bars_out = ax.bar(x + bar_width / 2, cal_out, bar_width, label="⚡ 消耗",
+    bars_out = ax.bar(x + bar_width / 2, cal_out, bar_width, label="消耗",
                       color="#00ff88", alpha=0.85)
 
     for bar in bars_in:
@@ -224,9 +243,9 @@ def render_calorie_chart(img: Image.Image, stats_list: list[dict]):
     ax.spines["right"].set_visible(False)
     ax.spines["bottom"].set_color(CHART_GRID_COLOR)
     ax.spines["left"].set_color(CHART_GRID_COLOR)
-    ax.legend(loc="upper right", fontsize=9, facecolor="none",
+    ax.legend(loc="upper left", fontsize=9, facecolor="none",
               edgecolor="none", labelcolor=CHART_TEXT_COLOR)
-    ax.set_title("🔥 今日热量对比", color=CHART_TEXT_COLOR, fontsize=14, pad=10)
+    ax.set_title("今日热量对比", color=CHART_TEXT_COLOR, fontsize=14, pad=10)
     plt.tight_layout()
 
     buf = io.BytesIO()
@@ -234,8 +253,8 @@ def render_calorie_chart(img: Image.Image, stats_list: list[dict]):
     plt.close(fig)
     buf.seek(0)
     chart_img = Image.open(buf).convert("RGBA")
-    chart_img = chart_img.resize((IMAGE_WIDTH - 40, area_height - 10), Image.LANCZOS)
-    img.paste(chart_img, (20, y_start + 5), chart_img)
+    chart_img = chart_img.resize((IMAGE_WIDTH - 20, area_height), Image.LANCZOS)
+    img.paste(chart_img, (10, y_start), chart_img)
 
 
 def render_footer(img: Image.Image, mvp: dict, report_date: date):
@@ -251,20 +270,20 @@ def render_footer(img: Image.Image, mvp: dict, report_date: date):
     draw.line([(40, y_start), (IMAGE_WIDTH - 40, y_start)], fill=(255, 255, 255, 40), width=1)
 
     deficit = mvp["calorie_deficit"]
-    mvp_text = f"🏆 今日MVP: {mvp['name']} (热量缺口 {deficit}kcal！)"
+    mvp_text = f"★ 今日MVP: {mvp['name']} (热量缺口 {deficit}kcal！)"
     bbox = draw.textbbox((0, 0), mvp_text, font=font_mvp)
     text_w = bbox[2] - bbox[0]
     x = (IMAGE_WIDTH - text_w) // 2
     draw.text((x, y_start + 15), mvp_text, fill=COLOR_GOLD, font=font_mvp)
 
     quote = random.choice(ENCOURAGEMENTS)
-    quote_text = f'💬 "{quote}"'
+    quote_text = f'"{quote}"'
     bbox = draw.textbbox((0, 0), quote_text, font=font_quote)
     text_w = bbox[2] - bbox[0]
     x = (IMAGE_WIDTH - text_w) // 2
     draw.text((x, y_start + 55), quote_text, fill=COLOR_WHITE, font=font_quote)
 
-    date_text = f"📅 {report_date.year}年{report_date.month}月{report_date.day}日"
+    date_text = f"{report_date.year}年{report_date.month}月{report_date.day}日"
     bbox = draw.textbbox((0, 0), date_text, font=font_date)
     text_w = bbox[2] - bbox[0]
     x = (IMAGE_WIDTH - text_w) // 2
