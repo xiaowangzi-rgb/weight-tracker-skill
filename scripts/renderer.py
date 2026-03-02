@@ -123,7 +123,12 @@ def render_character_status(img: Image.Image, stats_list: list[dict]):
         avatar = AVATARS[i % len(AVATARS)]
         color = tuple(int(CHART_COLORS[i % len(CHART_COLORS)].lstrip("#")[j:j+2], 16) for j in (0, 2, 4))
 
-        name_text = f"{avatar} {stats['name']}  LV.{stats['day_number']}"
+        # 昵称 + 等级 + 经验值
+        level = stats.get("level", 0)
+        level_xp = stats.get("level_xp", 0)
+        level_needed = stats.get("level_needed", 100)
+        total_xp = stats.get("total_xp", 0)
+        name_text = f"{avatar} {stats['name']}  LV.{level}  ({total_xp}XP)"
         draw.text((left_margin, y), name_text, fill=COLOR_GOLD, font=font_name)
 
         bar_y = y + 35

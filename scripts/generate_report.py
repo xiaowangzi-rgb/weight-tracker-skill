@@ -15,7 +15,7 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config import DEFAULT_TEAM_NAME, DEFAULT_CSV, REPORTS_DIR
-from data_loader import load_data, compute_person_stats, find_mvp
+from data_loader import load_data, compute_person_stats, find_mvp, compute_xp
 from renderer import (
     create_canvas,
     render_title,
@@ -56,6 +56,11 @@ def generate_report(
     # 2. 计算每人统计数据
     stats_list = [compute_person_stats(df, name, target_date) for name in names]
     mvp = find_mvp(stats_list)
+
+    # 3. 计算经验值和等级
+    for stats in stats_list:
+        xp_info = compute_xp(df, stats["name"], target_date)
+        stats.update(xp_info)
 
     # 3. 渲染
     img = create_canvas()

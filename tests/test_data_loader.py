@@ -9,7 +9,7 @@ import pytest
 # 让 tests/ 能 import scripts/ 下的模块
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-from data_loader import load_data, compute_person_stats, find_mvp
+from data_loader import load_data, compute_person_stats, find_mvp, xp_for_level, total_xp_for_level, level_from_xp, compute_xp
 
 
 SAMPLE_CSV = """\
@@ -103,3 +103,57 @@ class TestFindMVP:
         history = stats["weight_history"]
         assert len(history) == 2
         assert history[-1] == 73.2
+
+
+class TestXPSystem:
+    def test_xp_for_level(self):
+        assert xp_for_level(1) == 100   # LV.1 需要 100
+        assert xp_for_level(2) == 150   # LV.2 需要 150
+        assert xp_for_level(3) == 200   # LV.3 需要 200
+        assert xp_for_level(4) == 250   # LV.4 需要 250
+
+    def test_total_xp_for_level(self):
+        assert total_xp_for_level(1) == 100    # LV.1: 100
+        assert total_xp_for_level(2) == 250    # LV.2: 100+150
+        assert total_xp_for_level(3) == 450    # LV.3: 100+150+200
+
+    def test_level_from_xp_zero(self):
+        level, cur, needed = level_from_xp(0)
+        assert level == 0
+        assert cur == 0
+        assert needed == 100
+
+    def test_level_from_xp_exact_level1(self):
+        level, cur, needed = level_from_xp(100)
+        assert level == 1
+        assert cur == 0
+        assert needed == 150
+
+    def test_level_from_xp_mid_level2(self):
+        level, cur, needed = level_from_xp(200)
+        assert level == 1
+        assert cur == 100
+        assert needed == 150
+
+    def test_level_from_xp_exact_level2(self):
+        level, cur, needed = level_from_xp(250)
+        assert level == 2
+        assert cur == 0
+        assert needed == 200
+
+    def test_compute_xp_with_sample_data(self, csv_path):
+        """Day1: 小王子deficit=-320(MVP), 小红deficit=-300
+        Day2: 小王子deficit=-330, 小红deficit=-340(MVP)
+        小王子: 达标50*2 + MVP100*1 = 200
+        小红: 达标50*2 + MVP100*1 = 200"""
+        df = load_data(csv_path)
+        xp_wangzi = compute_xp(df, "小王子", date(2026, 3, 2))
+        xp_hong = compute_xp(df, "小红", date(2026, 3, 2))
+
+        # 小王子: 2天达标*50 + 1天MVP*100 = 200 → LV.1 (剩100/150)
+        assert xp_wangzi["total_xp"] == 200
+        assert xp_wangzi["level"] == 1
+
+        # 小红: 2天达标*50 + 1天MVP*100 = 200 → LV.1 (剩100/150)
+        assert xp_hong["total_xp"] == 200
+        assert xp_hong["level"] == 1

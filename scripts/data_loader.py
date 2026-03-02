@@ -71,3 +71,74 @@ def compute_person_stats(df: pd.DataFrame, name: str, target_date: date) -> dict
 def find_mvp(stats_list: list[dict]) -> dict:
     """找到当日热量缺口最大（最负）的人。"""
     return min(stats_list, key=lambda s: s["calorie_deficit"])
+
+
+def xp_for_level(level: int) -> int:
+    """计算升到指定等级所需的经验值。LV.1=100, LV.2=150, 每级+50。"""
+    return 100 + 50 * (level - 1)
+
+
+def total_xp_for_level(level: int) -> int:
+    """计算达到指定等级所需的累计总经验值。"""
+    # sum of (100 + 50*(i-1)) for i=1..level
+    return sum(xp_for_level(i) for i in range(1, level + 1))
+
+
+def level_from_xp(xp: int) -> tuple[int, int, int]:
+    """根据累计经验值计算等级。返回 (等级, 当前级已获得经验, 当前级所需经验)。"""
+    level = 0
+    remaining = xp
+    while True:
+        needed = xp_for_level(level + 1)
+        if remaining < needed:
+            return level, remaining, needed
+        remaining -= needed
+        level += 1
+
+
+def compute_xp(df: pd.DataFrame, name: str, target_date: date) -> dict:
+    """回溯历史数据，计算某人截至 target_date 的累计经验值和等级。
+
+    规则:
+    - 当天达标(消耗 > 摄入): +50 XP
+    - 当天 MVP(缺口最大):    额外 +100 XP
+    """
+    target_ts = pd.Timestamp(target_date)
+    all_names = df["name"].unique().tolist()
+    person_df = df[df["name"] == name].sort_values("date")
+    dates_up_to = person_df[person_df["date"] <= target_ts]["date"].unique()
+
+    total_xp = 0
+    for day_ts in sorted(dates_up_to):
+        day = pd.Timestamp(day_ts)
+        # 这一天此人的数据
+        row = df[(df["name"] == name) & (df["date"] == day)]
+        if row.empty:
+            continue
+        row = row.iloc[0]
+        deficit = int(row["calories_in"]) - int(row["calories_out"])
+
+        # 达标奖励
+        if deficit <= 0:
+            total_xp += 50
+
+        # MVP 奖励: 比较这一天所有人的缺口
+        day_deficits = {}
+        for n in all_names:
+            r = df[(df["name"] == n) & (df["date"] == day)]
+            if not r.empty:
+                r = r.iloc[0]
+                day_deficits[n] = int(r["calories_in"]) - int(r["calories_out"])
+
+        if day_deficits:
+            mvp_name = min(day_deficits, key=day_deficits.get)
+            if mvp_name == name:
+                total_xp += 100
+
+    level, level_xp, level_needed = level_from_xp(total_xp)
+    return {
+        "total_xp": total_xp,
+        "level": level,
+        "level_xp": level_xp,       # 当前级已获得
+        "level_needed": level_needed,  # 当前级总共需要
+    }
